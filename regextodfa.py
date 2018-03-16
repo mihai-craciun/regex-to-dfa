@@ -149,7 +149,7 @@ class RegexNode:
             self.lastpos = [pos]
             self.position = pos
             #Add the position in the followpos list
-            followpos.append([pos,[]])
+            followpos.append([self.item,[]])
             return pos+1
         #Is an internal node
         for child in self.children:
@@ -217,7 +217,8 @@ class RegexTree:
 
     def functions(self):
         positions = self.root.calc_functions(0, self.followpos)   
-        print(self.followpos)
+        if DEBUG == True:
+            print(self.followpos)
 
 #Preprocessing Functions
 def preprocess(regex):
