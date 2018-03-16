@@ -16,9 +16,6 @@ def valid_brackets(regex):
             print('ERROR missing bracket')
             return False
     if opened_brackets == 0:
-        if '()' in regex:
-            print('ERROR empty brackets')
-            return False
         return True
     print('ERROR unclosed brackets')
     return False
@@ -208,6 +205,8 @@ def preprocess(regex):
     regex = clean_kleene(regex)
     regex = regex.replace(' ','')
     regex = '(' + regex + ')' + '#'
+    while '()' in regex:
+        regex = regex.replace('()','')
     return regex
 
 def clean_kleene(regex):
