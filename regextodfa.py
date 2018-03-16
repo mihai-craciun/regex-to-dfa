@@ -56,7 +56,7 @@ class RegexNode:
     
     @staticmethod
     def is_letter(c):
-        return c == '#' or c.isalnum() or c in extended_symbols
+        return c in alphabet
 
     def __init__(self, regex):
         self.nullable = None
@@ -211,6 +211,7 @@ class RegexTree:
     def __init__(self, regex):
         self.root = RegexNode(regex)
         self.followpos = []
+        self.functions()
     
     def write(self):
         self.root.write_level(0)
@@ -219,6 +220,76 @@ class RegexTree:
         positions = self.root.calc_functions(0, self.followpos)   
         if DEBUG == True:
             print(self.followpos)
+    
+    def toDfa(self):
+
+        def contains_hashtag(q):
+            for i in q:
+                if self.followpos[i][0] == '#':
+                    return True
+            return False
+
+        M = [] #Marked states
+        Q = [] 
+        V = alphabet - {'#'}
+        d = []
+        F = []
+        q0 = self.root.firstpos
+
+        Q.append(q0)
+        if contains_hashtag(q0):
+            F.append(Q.index(q0))
+        
+        while len(Q) - len(M) > 0:
+            #There exists one unmarked
+            q = [i for i in Q if i not in M][0]
+            M.append(q)
+            for a in V:
+                U = []
+                #Compute U
+                #foreach i in state
+                for i in q:
+                    #if i has label a
+                    if self.followpos[i][0] == a:
+                        U = U + self.followpos[i][1]
+                U = sorted(list(set(U)))
+                if U not in Q:
+                    Q.append(U)
+                    if contains_hashtag(U):
+                        F.append(Q.index(U))
+                if not Q.index(U) in d:
+                    d.append({})
+                d[Q.index(q)][a] = Q.index(U)
+        
+        return Dfa(len(Q),V,d,Q.index(q0),F)
+
+        
+class Dfa:
+
+    def __init__(self,Q,V,d,q0,F):
+        self.Q = Q
+        self.V = V
+        self.d = d
+        self.q0 = q0
+        self.F = F
+
+    def run(self, text):
+        #Checking if the input is in the current alphabet
+        if len(set(text) - self.V) != 0:
+            #Not all the characters are in the language
+            print('ERROR characters',(set(text)-self.V),'are not in the automata\'s alphabet')
+            exit(0)
+        
+        #Running the automata
+        q = self.q0
+        for i in text:
+            #Execute transition
+            q = self.d[q][i]
+        
+        if q in self.F:
+            print('Message accepted!')
+        else:
+            print('Message NOT accepted')
 
 #Preprocessing Functions
 def preprocess(regex):
@@ -235,16 +306,19 @@ def clean_kleene(regex):
             regex = regex[:i] + regex[i + 1:]
     return regex
 
+def gen_alphabet(regex):
+    return set(regex) - set('()|*')
 
 #Settings
-DEBUG = True
+DEBUG = False
 use_lambda = False
 lambda_symbol = '_'
-extended_symbols = lambda_symbol + '@%^'
+alphabet = None
 
 #Main
 regex = '(aa|b)*ab(bb|a)*'
 regex = preprocess(regex)
+alphabet = gen_alphabet(regex)
 
 #Check
 if not is_valid_regex(regex):
@@ -252,5 +326,9 @@ if not is_valid_regex(regex):
 
 #Construct
 tree = RegexTree(regex)
-tree.functions()
-tree.write()
+# tree.write()
+dfa = tree.toDfa()
+
+#Test
+message = 'baaab'
+dfa.run(message)
