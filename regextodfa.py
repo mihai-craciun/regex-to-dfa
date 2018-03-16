@@ -244,6 +244,8 @@ class RegexTree:
             #There exists one unmarked
             #We take one of those
             q = [i for i in Q if i not in M][0]
+            #Generating the delta dictionary for the new state
+            d.append({})
             #We mark it
             M.append(q)
             #For each letter in the automata's alphabet
@@ -266,10 +268,6 @@ class RegexTree:
                     Q.append(U)
                     if contains_hashtag(U):
                         F.append(Q.index(U))
-                #Delta is computed dynamically
-                #If this is the first time computing d(q,..) then we must allocate this list
-                if Q.index(q) >= len(d):
-                    d.append({})
                 #d(q,a) = U
                 d[Q.index(q)][a] = Q.index(U)
         
@@ -295,7 +293,13 @@ class Dfa:
         #Running the automata
         q = self.q0
         for i in text:
-            #Check
+            #Check if transition exists
+            if q >= len(self.d):
+                print('Message NOT accepted, state has no transitions')
+                exit(0)
+            if i not in self.d[q].keys():
+                print('Message NOT accepted, state has no transitions with the character')
+                exit(0)
             #Execute transition
             q = self.d[q][i]
         
@@ -306,7 +310,8 @@ class Dfa:
 
     def write(self):
         for i in range(len(self.Q)):
-            print(i,self.d[i])
+            #Printing index, the delta fuunction for that transition and if it's final state
+            print(i,self.d[i],'F' if i in self.F else '')
 
 #Preprocessing Functions
 def preprocess(regex):
@@ -342,10 +347,14 @@ if not is_valid_regex(regex):
 #Preprocess regex and generate the alphabet    
 p_regex = preprocess(regex)
 alphabet = gen_alphabet(p_regex)
+#add optional letters that don't appear in the expression
+extra = ''
+alphabet = alphabet.union(set(extra))
 
 #Construct
 tree = RegexTree(p_regex)
-# tree.write()
+if DEBUG:
+    tree.write()
 dfa = tree.toDfa()
 
 #Test
