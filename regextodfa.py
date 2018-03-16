@@ -142,16 +142,18 @@ class RegexNode:
             self.item = '*'
             self.children.append(RegexNode(self.trim_brackets(regex[:kleene])))
 
-    def calc_functions(self, pos):
+    def calc_functions(self, pos, followpos):
         if self.is_letter(self.item):
             #Is a leaf
             self.firstpos = [pos]
             self.lastpos = [pos]
             self.position = pos
+            #Add the position in the followpos list
+            followpos.append([pos,[]])
             return pos+1
         #Is an internal node
         for child in self.children:
-            pos = child.calc_functions(pos)
+            pos = child.calc_functions(pos, followpos)
         #Calculate current functions
 
         if self.item == '.':
@@ -168,6 +170,11 @@ class RegexNode:
                 self.lastpos = deepcopy(self.children[1].lastpos)
             #Nullable
             self.nullable = self.children[0].nullable and self.children[1].nullable
+            #Followpos
+            for i in self.children[0].lastpos:
+                for j in self.children[1].firstpos:
+                    if j not in followpos[i][1]:
+                        followpos[i][1] = sorted(followpos[i][1] + [j])
 
         elif self.item == '|':
             #Is or operator
@@ -186,6 +193,11 @@ class RegexNode:
             self.lastpos = deepcopy(self.children[0].lastpos)
             #Nullable
             self.nullable = True
+            #Followpos
+            for i in self.children[0].lastpos:
+                for j in self.children[0].firstpos:
+                    if j not in followpos[i][1]:
+                        followpos[i][1] = sorted(followpos[i][1] + [j])
 
         return pos
 
@@ -204,8 +216,8 @@ class RegexTree:
         self.root.write_level(0)
 
     def functions(self):
-        #Calculate and get number of positions
-        positions = self.root.calc_functions(1)   
+        positions = self.root.calc_functions(0, self.followpos)   
+        print(self.followpos)
 
 #Preprocessing Functions
 def preprocess(regex):
