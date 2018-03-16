@@ -230,10 +230,10 @@ class RegexTree:
             return False
 
         M = [] #Marked states
-        Q = [] 
-        V = alphabet - {'#'}
-        d = []
-        F = []
+        Q = [] #States list in the followpos form ( array of positions ) 
+        V = alphabet - {'#', lambda_symbol if use_lambda else ''} #Automata alphabet
+        d = [] #Delta function, an array of dictionaries d[q] = {x1:q1, x2:q2 ..} where d(q,x1) = q1, d(q,x2) = q2..
+        F = [] #FInal states list in the form of indexes (int)
         q0 = self.root.firstpos
 
         Q.append(q0)
@@ -242,26 +242,38 @@ class RegexTree:
         
         while len(Q) - len(M) > 0:
             #There exists one unmarked
+            #We take one of those
             q = [i for i in Q if i not in M][0]
+            #We mark it
             M.append(q)
+            #For each letter in the automata's alphabet
             for a in V:
+                # Compute destination state ( d(q,a) = U )
                 U = []
                 #Compute U
-                #foreach i in state
+                #foreach position in state
                 for i in q:
                     #if i has label a
                     if self.followpos[i][0] == a:
+                        #We add the position to U's composition
                         U = U + self.followpos[i][1]
                 U = sorted(list(set(U)))
+                #Checking if this is a valid state
+                if len(U) == 0:
+                    #No positions, skipping, it won't produce any new states ( also won't be final )
+                    continue
                 if U not in Q:
                     Q.append(U)
                     if contains_hashtag(U):
                         F.append(Q.index(U))
-                if not Q.index(U) in d:
+                #Delta is computed dynamically
+                #If this is the first time computing d(q,..) then we must allocate this list
+                if Q.index(q) >= len(d):
                     d.append({})
+                #d(q,a) = U
                 d[Q.index(q)][a] = Q.index(U)
         
-        return Dfa(len(Q),V,d,Q.index(q0),F)
+        return Dfa(Q,V,d,Q.index(q0),F)
 
         
 class Dfa:
@@ -283,13 +295,18 @@ class Dfa:
         #Running the automata
         q = self.q0
         for i in text:
+            #Check
             #Execute transition
             q = self.d[q][i]
         
         if q in self.F:
             print('Message accepted!')
         else:
-            print('Message NOT accepted')
+            print('Message NOT accepted, stopped in an unfinal state')
+
+    def write(self):
+        for i in range(len(self.Q)):
+            print(i,self.d[i])
 
 #Preprocessing Functions
 def preprocess(regex):
@@ -317,18 +334,25 @@ alphabet = None
 
 #Main
 regex = '(aa|b)*ab(bb|a)*'
-regex = preprocess(regex)
-alphabet = gen_alphabet(regex)
 
 #Check
 if not is_valid_regex(regex):
     exit(0)
 
+#Preprocess regex and generate the alphabet    
+p_regex = preprocess(regex)
+alphabet = gen_alphabet(p_regex)
+
 #Construct
-tree = RegexTree(regex)
+tree = RegexTree(p_regex)
 # tree.write()
 dfa = tree.toDfa()
 
 #Test
 message = 'baaab'
+print('This is the regex : ' + regex)
+print('This is the alphabet : ' + ''.join(sorted(alphabet)))
+print('This is the automata : \n')
+dfa.write()
+print('\nTesting for : "'+message+'" : ')
 dfa.run(message)
