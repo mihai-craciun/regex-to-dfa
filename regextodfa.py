@@ -1,6 +1,8 @@
+from copy import deepcopy
+
 #Regex validation
 def is_valid_regex(regex):
-    return valid_brackets(regex) and valid_operations(regex) and valid_non_lambda_arguments(regex)
+    return valid_brackets(regex) and valid_operations(regex)
 
 
 def valid_brackets(regex):
@@ -14,6 +16,9 @@ def valid_brackets(regex):
             print('ERROR missing bracket')
             return False
     if opened_brackets == 0:
+        if '()' in regex:
+            print('ERROR empty brackets')
+            return False
         return True
     print('ERROR unclosed brackets')
     return False
@@ -40,14 +45,6 @@ def valid_operations(regex):
                 return False
     return True
 
-
-def valid_non_lambda_arguments(regex):
-    if '()' in regex:
-       print('ERROR lambda argument')
-       return False
-    return True
-
-
 class RegexTree:
 
     @staticmethod
@@ -58,7 +55,11 @@ class RegexTree:
     
     @staticmethod
     def is_concat(c):
-        return c == '(' or c == '#' or c.isalnum()
+        return c == '(' or RegexTree.is_letter(c)
+    
+    @staticmethod
+    def is_letter(c):
+        return c == '#' or c.isalnum() or c in extended_symbols
 
     def __init__(self, regex):
         self.nullable = None
@@ -70,10 +71,17 @@ class RegexTree:
         if DEBUG:
             print('Current : '+regex)
         #Check if it is leaf
-        if len(regex) == 1 and ( regex.isalnum() or regex == '#'):
+        if len(regex) == 1 and self.is_letter(regex):
             #Leaf
             self.item = regex
-            self.nullable = False
+            #Lambda checking
+            if use_lambda:
+                if self.item == lambda_symbol:
+                    self.nullable = True
+                else:
+                    self.nullable = False
+            else:
+                self.nullable = False
             return
         
         #It is an internal node
@@ -135,12 +143,61 @@ class RegexTree:
             #Found a kleene
             self.item = '*'
             self.children.append(RegexTree(self.trim_brackets(regex[:kleene])))
+    
+    def functions(self):
+        self.calc_functions(1)
+
+    def calc_functions(self, pos):
+        if self.is_letter(self.item):
+            #Is a leaf
+            self.firstpos = [pos]
+            self.lastpos = [pos]
+            return pos+1
+        #Is an internal node
+        for child in self.children:
+            pos = child.calc_functions(pos)
+        #Calculate current functions
+
+        if self.item == '.':
+            #Is concatenation
+            #Firstpos
+            if self.children[0].nullable:
+                self.firstpos = sorted(list(set(self.children[0].firstpos + self.children[1].firstpos)))
+            else:
+                self.firstpos = deepcopy(self.children[0].firstpos)
+            #Lastpos
+            if self.children[1].nullable:
+                self.lastpos = sorted(list(set(self.children[0].lastpos + self.children[1].lastpos)))
+            else:
+                self.lastpos = deepcopy(self.children[1].lastpos)
+            #Nullable
+            self.nullable = self.children[0].nullable and self.children[1].nullable
+
+        elif self.item == '|':
+            #Is or operator
+            #Firstpos
+            self.firstpos = sorted(list(set(self.children[0].firstpos + self.children[1].firstpos)))
+            #Lastpos
+            self.lastpos = sorted(list(set(self.children[0].lastpos + self.children[1].lastpos)))
+            #Nullable
+            self.nullable = self.children[0].nullable or self.children[1].nullable
+
+        elif self.item == '*':
+            #Is kleene
+            #Firstpos
+            self.firstpos = deepcopy(self.children[0].firstpos)
+            #Lastpos
+            self.lastpos = deepcopy(self.children[0].lastpos)
+            #Nullable
+            self.nullable = True
+
+        return pos
 
     def write(self):
         self.write_level(0)
 
     def write_level(self, level):
-        print(str(level) + ' ' + self.item)
+        print(str(level) + ' ' + self.item, self.firstpos, self.lastpos, self.nullable)
         for child in self.children:
             child.write_level(level+1)
 
@@ -160,8 +217,13 @@ def clean_kleene(regex):
     return regex
 
 
-#Main
+#Settings
 DEBUG = True
+use_lambda = False
+lambda_symbol = '_'
+extended_symbols = lambda_symbol + '@%^'
+
+#Main
 regex = '(aa|b)*ab(bb|a)*'
 regex = preprocess(regex)
 
@@ -171,4 +233,5 @@ if not is_valid_regex(regex):
 
 #Construct
 tree = RegexTree(regex)
+tree.functions()
 tree.write()
