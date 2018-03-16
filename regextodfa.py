@@ -42,7 +42,7 @@ def valid_operations(regex):
                 return False
     return True
 
-class RegexTree:
+class RegexNode:
 
     @staticmethod
     def trim_brackets(regex):
@@ -52,7 +52,7 @@ class RegexTree:
     
     @staticmethod
     def is_concat(c):
-        return c == '(' or RegexTree.is_letter(c)
+        return c == '(' or RegexNode.is_letter(c)
     
     @staticmethod
     def is_letter(c):
@@ -63,6 +63,7 @@ class RegexTree:
         self.firstpos = []
         self.lastpos = []
         self.item = None
+        self.position = None
         self.children = []
 
         if DEBUG:
@@ -129,26 +130,24 @@ class RegexTree:
         if or_operator != -1:
             #Found an or operation
             self.item = '|'
-            self.children.append(RegexTree(self.trim_brackets(regex[:or_operator])))
-            self.children.append(RegexTree(self.trim_brackets(regex[(or_operator+1):])))
+            self.children.append(RegexNode(self.trim_brackets(regex[:or_operator])))
+            self.children.append(RegexNode(self.trim_brackets(regex[(or_operator+1):])))
         elif concatenation != -1:
             #Found a concatenation
             self.item = '.'
-            self.children.append(RegexTree(self.trim_brackets(regex[:concatenation])))
-            self.children.append(RegexTree(self.trim_brackets(regex[concatenation:])))
+            self.children.append(RegexNode(self.trim_brackets(regex[:concatenation])))
+            self.children.append(RegexNode(self.trim_brackets(regex[concatenation:])))
         elif kleene != -1:
             #Found a kleene
             self.item = '*'
-            self.children.append(RegexTree(self.trim_brackets(regex[:kleene])))
-    
-    def functions(self):
-        self.calc_functions(1)
+            self.children.append(RegexNode(self.trim_brackets(regex[:kleene])))
 
     def calc_functions(self, pos):
         if self.is_letter(self.item):
             #Is a leaf
             self.firstpos = [pos]
             self.lastpos = [pos]
+            self.position = pos
             return pos+1
         #Is an internal node
         for child in self.children:
@@ -190,15 +189,23 @@ class RegexTree:
 
         return pos
 
-    def write(self):
-        self.write_level(0)
-
     def write_level(self, level):
-        print(str(level) + ' ' + self.item, self.firstpos, self.lastpos, self.nullable)
+        print(str(level) + ' ' + self.item, self.firstpos, self.lastpos, self.nullable, '' if self.position == None else self.position)
         for child in self.children:
             child.write_level(level+1)
 
+class RegexTree:
 
+    def __init__(self, regex):
+        self.root = RegexNode(regex)
+        self.followpos = []
+    
+    def write(self):
+        self.root.write_level(0)
+
+    def functions(self):
+        #Calculate and get number of positions
+        positions = self.root.calc_functions(1)   
 
 #Preprocessing Functions
 def preprocess(regex):
